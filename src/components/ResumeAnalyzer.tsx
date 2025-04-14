@@ -77,9 +77,24 @@ const ResumeAnalyzer = () => {
         throw new Error(`Error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
       
-      const data = await response.json();
-      console.log("Response data:", data);
-      setResult(data);
+      const responseData = await response.json();
+      console.log("Response data:", responseData);
+      
+      // Extract and parse the JSON string from the markdown-formatted response
+      const jsonString = responseData.result.replace(/```json\n|\n```/g, '');
+      console.log("Extracted JSON string:", jsonString);
+      
+      const parsedData = JSON.parse(jsonString);
+      console.log("Parsed data:", parsedData);
+      
+      // Map the backend response to our expected format
+      const formattedResult: AnalysisResult = {
+        match_percentage: parsedData.match_score,
+        missing_keywords: parsedData.missing_keywords,
+        improvement_summary: parsedData.summary
+      };
+      
+      setResult(formattedResult);
     } catch (error) {
       console.error("Analysis failed:", error);
       toast({

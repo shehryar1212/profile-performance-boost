@@ -13,7 +13,7 @@ interface AnalysisResultsProps {
 }
 
 const AnalysisResults = ({ result, onReset }: AnalysisResultsProps) => {
-  const { match_percentage, missing_keywords, improvement_summary } = result;
+  const { match_percentage, missing_keywords = [], improvement_summary = "" } = result;
   
   // Determine score category and styling
   const getScoreDetails = () => {
