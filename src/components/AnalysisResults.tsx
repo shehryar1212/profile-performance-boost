@@ -23,6 +23,7 @@ const AnalysisResults = ({ result, onReset }: AnalysisResultsProps) => {
         color: "text-green-600",
         bgColor: "bg-green-100",
         borderColor: "border-green-200",
+        progressColor: "bg-green-500",
         message: "Excellent match!"
       };
     } else if (match_percentage >= 60) {
@@ -31,6 +32,7 @@ const AnalysisResults = ({ result, onReset }: AnalysisResultsProps) => {
         color: "text-amber-600",
         bgColor: "bg-amber-50",
         borderColor: "border-amber-200",
+        progressColor: "bg-amber-500",
         message: "Good match with room for improvement"
       };
     } else {
@@ -39,19 +41,13 @@ const AnalysisResults = ({ result, onReset }: AnalysisResultsProps) => {
         color: "text-red-600",
         bgColor: "bg-red-50",
         borderColor: "border-red-200",
+        progressColor: "bg-red-500",
         message: "Significant gaps detected"
       };
     }
   };
   
   const scoreDetails = getScoreDetails();
-  
-  // Determine progress color
-  const getProgressColor = () => {
-    if (match_percentage >= 80) return "bg-green-500";
-    if (match_percentage >= 60) return "bg-amber-500";
-    return "bg-red-500";
-  };
 
   return (
     <div className="space-y-8">
@@ -62,7 +58,7 @@ const AnalysisResults = ({ result, onReset }: AnalysisResultsProps) => {
           <Progress 
             value={match_percentage} 
             className="h-8 rounded-full"
-            indicatorClassName={getProgressColor()}
+            indicatorColor={scoreDetails.progressColor}
           />
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="font-bold text-white drop-shadow-sm">
