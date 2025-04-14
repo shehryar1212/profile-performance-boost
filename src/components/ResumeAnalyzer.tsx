@@ -60,20 +60,25 @@ const ResumeAnalyzer = () => {
     setIsAnalyzing(true);
     
     const formData = new FormData();
-    formData.append("resume", resume);
+    // Use the field name 'file' instead of 'resume' as expected by the backend
+    formData.append("file", resume);
     formData.append("job_description", jobDescription);
     
     try {
+      console.log("Sending request to backend...");
       const response = await fetch("http://127.0.0.1:8000/analyze/", {
         method: "POST",
         body: formData,
       });
       
       if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
+        const errorData = await response.json();
+        console.error("Error response:", errorData);
+        throw new Error(`Error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
       
       const data = await response.json();
+      console.log("Response data:", data);
       setResult(data);
     } catch (error) {
       console.error("Analysis failed:", error);
