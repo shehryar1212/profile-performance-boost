@@ -1,10 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, CheckCircle, AlertCircle, ChevronRight } from "lucide-react";
+import { Upload, FileText, CheckCircle, ChevronRight } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import AnalysisResults from "@/components/AnalysisResults";
 
@@ -22,18 +20,30 @@ const ResumeAnalyzer = () => {
   const { toast } = useToast();
 
   const handleResumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.type !== "application/pdf") {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setResume(file);
+    if (!e.target.files?.[0]) return;
+    
+    const file = e.target.files[0];
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF file",
+        variant: "destructive",
+      });
+      e.target.value = ""; // Reset input
+      return;
     }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        title: "File too large",
+        description: "Please upload a PDF smaller than 5MB",
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
+    }
+    
+    setResume(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,47 +69,41 @@ const ResumeAnalyzer = () => {
     
     setIsAnalyzing(true);
     
-    const formData = new FormData();
-    // Use the field name 'file' instead of 'resume' as expected by the backend
-    formData.append("file", resume);
-    formData.append("job_description", jobDescription);
-    
     try {
-      console.log("Sending request to backend...");
-      const response = await fetch("https://resume-analyzer-flask-production.up.railway.app/analyze/", {
+      const formData = new FormData();
+      formData.append("file", resume);
+      formData.append("job_description", jobDescription);
+      
+      const response = await fetch("https://resume-analyzer-flask-production.up.railway.app/analyze", { // Removed trailing slash
         method: "POST",
         body: formData,
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error response:", errorData);
-        throw new Error(`Error: ${response.status} - ${JSON.stringify(errorData)}`);
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP error! status: ${response.status}`);
       }
       
       const responseData = await response.json();
-      console.log("Response data:", responseData);
       
-      // Extract and parse the JSON string from the markdown-formatted response
-      const jsonString = responseData.result.replace(/```json\n|\n```/g, '');
-      console.log("Extracted JSON string:", jsonString);
+      // More robust JSON extraction
+      const jsonMatch = responseData.result.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Invalid response format from server");
+      }
       
-      const parsedData = JSON.parse(jsonString);
-      console.log("Parsed data:", parsedData);
-      
-      // Map the backend response to our expected format
-      const formattedResult: AnalysisResult = {
+      const parsedData = JSON.parse(jsonMatch[0]);
+      setResult({
         match_percentage: parsedData.match_score,
-        missing_keywords: parsedData.missing_keywords,
-        improvement_summary: parsedData.summary
-      };
+        missing_keywords: parsedData.missing_keywords || [],
+        improvement_summary: parsedData.summary || "No summary provided"
+      });
       
-      setResult(formattedResult);
     } catch (error) {
       console.error("Analysis failed:", error);
       toast({
         title: "Analysis failed",
-        description: "Could not analyze your resume. Please try again.",
+        description: error instanceof Error ? error.message : "Could not analyze your resume",
         variant: "destructive",
       });
     } finally {
@@ -111,6 +115,9 @@ const ResumeAnalyzer = () => {
     setResult(null);
     setResume(null);
     setJobDescription("");
+    // Reset file input
+    const fileInput = document.getElementById("resume-upload") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
   };
 
   return (
@@ -118,7 +125,7 @@ const ResumeAnalyzer = () => {
       <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-t-lg">
         <CardTitle className="text-2xl font-bold">Resume Analyzer</CardTitle>
         <CardDescription className="text-blue-100">
-          Powered by Gemini AI
+          Get personalized feedback on your resume
         </CardDescription>
       </CardHeader>
       
@@ -143,20 +150,20 @@ const ResumeAnalyzer = () => {
                 {resume ? (
                   <div className="flex flex-col items-center text-green-600">
                     <CheckCircle className="h-8 w-8 mb-2" />
-                    <p className="font-medium">{resume.name}</p>
-                    <p className="text-sm text-gray-500">Click to change</p>
+                    <p className="font-medium truncate max-w-xs">{resume.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">{(resume.size / 1024).toFixed(1)} KB</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center text-gray-500">
                     <Upload className="h-8 w-8 mb-2" />
                     <p className="font-medium">Click to upload your resume</p>
-                    <p className="text-sm">PDF format only</p>
+                    <p className="text-sm">PDF, max 5MB</p>
                   </div>
                 )}
                 <input
                   id="resume-upload"
                   type="file"
-                  accept=".pdf"
+                  accept=".pdf,application/pdf"
                   onChange={handleResumeChange}
                   className="hidden"
                 />
@@ -165,33 +172,32 @@ const ResumeAnalyzer = () => {
             
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                Job Description
+                Job Description *
               </label>
               <Textarea
-                placeholder="Paste the job description here..."
+                placeholder="Paste the job description you're applying for..."
                 className="min-h-32 resize-none"
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
+                required
               />
             </div>
             
             <Button 
               type="submit" 
-              className="w-full"
+              className="w-full bg-blue-600 hover:bg-blue-700"
               disabled={isAnalyzing}
             >
               {isAnalyzing ? (
-                <div className="flex items-center">
-                  <div className="animate-spin mr-2">
-                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-                  </div>
+                <span className="flex items-center">
+                  <span className="animate-spin mr-2 inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                   Analyzing...
-                </div>
+                </span>
               ) : (
-                <div className="flex items-center">
+                <span className="flex items-center">
                   <FileText className="mr-2 h-4 w-4" />
                   Analyze Resume
-                </div>
+                </span>
               )}
             </Button>
           </form>
