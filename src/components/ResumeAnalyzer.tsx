@@ -66,7 +66,7 @@ const ResumeAnalyzer = () => {
     
     try {
       console.log("Sending request to backend...");
-      const response = await fetch("http://127.0.0.1:8000/analyze/", {
+      const response = await fetch("https://resume-analyzer-flask-production.up.railway.app/analyze/", {
         method: "POST",
         body: formData,
       });
